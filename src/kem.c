@@ -1,79 +1,119 @@
 #include <stddef.h>
+#include <stdio.h>
 #include "randombytes.h"
 #include "symmetric_crypto.h"
 #include "params.h"
-#include "pke.h"
-#include "poly.h"
-#include "pack.h"
+#include "ctru.h"
+#include "api.h"
 
-#if (USING_NEV_FO == 0) 
+unsigned char seed[CTRU_SEEDBYTES] = {};
+unsigned long long rand_get_sd_byts()
+{
+  return CTRU_SEEDBYTES;
+}
+int rand_init(unsigned char * s, unsigned long long s_byts)
+{
+  randombytes(s, s_byts);
+  for(int i = 0; i < s_byts; i ++)
+  {
+    seed[i] = s[i];
+  }
+  return 0;
+}
+int rand_byts(unsigned long long r_byts, unsigned char * r)
+{
+  crypto_hash_shake256(r, r_byts, seed, CTRU_SEEDBYTES);
+  return 0;
+}
+unsigned long long kem_get_pk_byts()
+{
+  return CTRU_KEM_PUBLICKEYBYTES;
+}
+unsigned long long kem_get_sk_byts()
+{
+  return CTRU_KEM_SECRETKEYBYTES;
+}
+unsigned long long kem_get_ss_byts()
+{
+  return CTRU_SHAREDKEYBYTES;
+}
+unsigned long long kem_get_ct_byts()
+{
+  return CTRU_KEM_CIPHERTEXTBYTES;
+}
 
-#if (USING_SHA2_VARIANT == 0)
 
-int crypto_kem_keygen(unsigned char *pk,
-                      unsigned char *sk)
+int kem_keygen(unsigned char * pk, unsigned long long * pk_byts, unsigned char * sk, unsigned long long * sk_byts)
 {
   unsigned int i;
-  unsigned char coins[CTRU_KEYGEN_COIN_BYTES];
+  unsigned char coins[CTRU_COINBYTES_KEYGEN];
 
   do
   {
-    randombytes(coins, CTRU_SEEDBYTES);
-    crypto_hash_shake256(coins, CTRU_KEYGEN_COIN_BYTES, coins, CTRU_SEEDBYTES);
-
-  } while (crypto_pke_keygen(pk, sk, coins));
+    rand_init(seed, CTRU_SEEDBYTES);
+    rand_byts(CTRU_COINBYTES_KEYGEN, coins);
+  } while (pke_keygen(pk, sk, coins));
 
   for (i = 0; i < CTRU_PKE_PUBLICKEYBYTES; ++i)
     sk[i + CTRU_PKE_SECRETKEYBYTES] = pk[i];
-
-  randombytes(sk + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES, CTRU_SEEDBYTES);
-
+  randombytes(sk + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES, CTRU_Z_BYTES);
+  
+  *pk_byts = CTRU_KEM_PUBLICKEYBYTES;
+  *sk_byts = CTRU_KEM_SECRETKEYBYTES;
   return 0;
 }
 
-int crypto_kem_encaps(unsigned char *ct,
-                      unsigned char *k,
-                      const unsigned char *pk)
+int kem_enc(unsigned char * pk, unsigned long long pk_byts,
+unsigned char * ss, unsigned long long * ss_byts,
+unsigned char * ct, unsigned long long * ct_byts)
 {
   unsigned int i;
-  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_ENC_COIN_BYTES], m[CTRU_PREFIXHASHBYTES + CTRU_MSGBYTES];
-
-  randombytes(buf, CTRU_SEEDBYTES);
-  crypto_hash_shake256(m + CTRU_PREFIXHASHBYTES, CTRU_MSGBYTES, buf, CTRU_SEEDBYTES);
+  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_COINBYTES_ENC], m[CTRU_MSGBYTES];
+  //buf2存ID(pk)||M
+  unsigned char buf2[CTRU_PREFIXHASHBYTES + CTRU_MSGBYTES];
+  randombytes(m, CTRU_MSGBYTES);
 
   for (i = 0; i < CTRU_PREFIXHASHBYTES; ++i)
-    m[i] = pk[i];
+    buf2[i] = pk[i];
+  for (i = 0; i < CTRU_MSGBYTES; ++i)
+    buf2[i+CTRU_PREFIXHASHBYTES] = m[i];
 
-  crypto_hash_sha3_512(buf, m, CTRU_PREFIXHASHBYTES + CTRU_MSGBYTES);
-  crypto_hash_shake256(buf + CTRU_SHAREDKEYBYTES, CTRU_ENC_COIN_BYTES, buf + CTRU_SHAREDKEYBYTES, CTRU_SEEDBYTES);
+  crypto_hash_sha3_512(buf, buf2, CTRU_PREFIXHASHBYTES + CTRU_MSGBYTES);
 
-  crypto_pke_enc(ct, pk, m + CTRU_PREFIXHASHBYTES, buf + CTRU_SHAREDKEYBYTES);
+  crypto_hash_shake256(buf + CTRU_SHAREDKEYBYTES, CTRU_COINBYTES_ENC, buf + CTRU_SHAREDKEYBYTES, CTRU_SHAREDKEYBYTES);
+
+  pke_enc(ct, pk, m, buf + CTRU_SHAREDKEYBYTES);
 
   for (i = 0; i < CTRU_SHAREDKEYBYTES; ++i)
-    k[i] = buf[i];
+    ss[i] = buf[i];
 
+  *ss_byts = CTRU_SHAREDKEYBYTES;
+  *ct_byts = CTRU_KEM_CIPHERTEXTBYTES;
   return 0;
 }
 
-int crypto_kem_decaps(unsigned char *k,
-                      const unsigned char *ct,
-                      const unsigned char *sk)
+int kem_dec(
+unsigned char * sk, unsigned long long sk_byts,
+unsigned char * ct, unsigned long long ct_byts,
+unsigned char * ss, unsigned long long * ss_byts)
 {
   unsigned int i;
-  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_ENC_COIN_BYTES], buf2[CTRU_SHAREDKEYBYTES * 2], m[CTRU_PREFIXHASHBYTES + CTRU_MSGBYTES];
-  unsigned char ct2[CTRU_PKE_CIPHERTEXTBYTES + CTRU_SEEDBYTES + CTRU_PREFIXHASHBYTES];
+  //buf存放导出密钥及采样需要的coin，buf2存~K，由于是SHA3_512的输出，需要等于64字节
+  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_COINBYTES_ENC], buf2[SHA3512_OUTPUTBYTES], m[CTRU_PREFIXHASHBYTES + CTRU_MSGBYTES];
+  unsigned char ct2[CTRU_PKE_CIPHERTEXTBYTES + CTRU_Z_BYTES + CTRU_PREFIXHASHBYTES];
   int16_t t;
-  int32_t fail;
+  uint32_t fail;
 
-  crypto_pke_dec(m + CTRU_PREFIXHASHBYTES, ct, sk);
+  pke_dec(m + CTRU_PREFIXHASHBYTES, ct, sk);
 
   for (i = 0; i < CTRU_PREFIXHASHBYTES; ++i)
     m[i] = sk[i + CTRU_PKE_SECRETKEYBYTES];
 
   crypto_hash_sha3_512(buf, m, CTRU_PREFIXHASHBYTES + CTRU_MSGBYTES);
-  crypto_hash_shake256(buf + CTRU_SHAREDKEYBYTES, CTRU_ENC_COIN_BYTES, buf + CTRU_SHAREDKEYBYTES, CTRU_SEEDBYTES);
 
-  crypto_pke_enc(ct2, sk + CTRU_PKE_SECRETKEYBYTES, m + CTRU_PREFIXHASHBYTES, buf + CTRU_SHAREDKEYBYTES);
+  crypto_hash_shake256(buf + CTRU_SHAREDKEYBYTES, CTRU_COINBYTES_ENC, buf + CTRU_SHAREDKEYBYTES, CTRU_SHAREDKEYBYTES);
+
+  pke_enc(ct2, sk + CTRU_PKE_SECRETKEYBYTES, m + CTRU_PREFIXHASHBYTES, buf + CTRU_SHAREDKEYBYTES);
 
   t = 0;
   for (i = 0; i < CTRU_PKE_CIPHERTEXTBYTES; ++i)
@@ -82,193 +122,24 @@ int crypto_kem_decaps(unsigned char *k,
   fail = (uint16_t)t;
   fail = (-fail) >> 31;
 
-  // for (i = 0; i < CTRU_PREFIXHASHBYTES; ++i)
-  //   ct2[i] = sk[i + CTRU_PKE_SECRETKEYBYTES];
-  // for (i = 0; i < CTRU_SEEDBYTES; ++i)
-  //   ct2[i + CTRU_PREFIXHASHBYTES] = sk[i + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES];
-  // for (i = 0; i < CTRU_PKE_CIPHERTEXTBYTES; ++i)
-  //   ct2[i + CTRU_PREFIXHASHBYTES + CTRU_SEEDBYTES] = ct[i];
-  // crypto_hash_sha3_512(buf2, ct2, CTRU_PKE_CIPHERTEXTBYTES + CTRU_SEEDBYTES + CTRU_PREFIXHASHBYTES);
-   //concatenate c
+
+  //concatenate c
   for(i = 0; i < CTRU_KEM_CIPHERTEXTBYTES; ++i)
   {
     ct2[i] = ct[i];
   }
   //concatenate z
-  for(i = 0; i < CTRU_SEEDBYTES; ++i)
+  for(i = 0; i < CTRU_Z_BYTES; ++i)
   {
     ct2[i+CTRU_KEM_CIPHERTEXTBYTES] = sk[i + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES];
   }
   //H(c,z)
-  crypto_hash_sha3_512(buf2, ct2, CTRU_KEM_CIPHERTEXTBYTES + CTRU_SEEDBYTES);
-  for (i = 0; i < CTRU_SHAREDKEYBYTES; ++i)
-    k[i] = buf[i] ^ ((-fail) & (buf[i] ^ buf2[i]));
+  crypto_hash_sha3_512(buf2, ct2, CTRU_KEM_CIPHERTEXTBYTES + CTRU_Z_BYTES);
+ 
 
+  for (i = 0; i < CTRU_SHAREDKEYBYTES; ++i)
+    ss[i] = buf[i] ^ ((-fail) & (buf[i] ^ buf2[i]));
+
+  *ss_byts = CTRU_SHAREDKEYBYTES;
   return fail;
 }
-
-#elif (USING_SHA2_VARIANT == 1) 
-static const unsigned char nonce[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-
-int crypto_kem_keygen(unsigned char *pk,
-                      unsigned char *sk)
-{
-  unsigned int i;
-  unsigned char coins[CTRU_KEYGEN_COIN_BYTES];
-
-  do
-  {
-    randombytes(coins, CTRU_SEEDBYTES);
-    crypto_stream(coins, CTRU_KEYGEN_COIN_BYTES, nonce, coins);
-  } while (crypto_pke_keygen(pk, sk, coins));
-
-  for (i = 0; i < CTRU_PKE_PUBLICKEYBYTES; ++i)
-    sk[i + CTRU_PKE_SECRETKEYBYTES] = pk[i];
-
-  return 0;
-}
-
-int crypto_kem_encaps(unsigned char *ct,
-                      unsigned char *k,
-                      const unsigned char *pk)
-{
-  unsigned int i;
-  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_ENC_COIN_BYTES], m[CTRU_MSGBYTES];
-
-  randombytes(buf, CTRU_SEEDBYTES);
-  crypto_stream(m, CTRU_MSGBYTES, nonce, buf);
-
-  crypto_hash_sha_512(buf, m, CTRU_MSGBYTES);
-  crypto_stream(buf + CTRU_SHAREDKEYBYTES, CTRU_ENC_COIN_BYTES, nonce, buf + CTRU_SHAREDKEYBYTES);
-
-  crypto_pke_enc(ct, pk, m, buf + CTRU_SHAREDKEYBYTES);
-
-  for (i = 0; i < CTRU_SHAREDKEYBYTES; ++i)
-    k[i] = buf[i];
-
-  return 0;
-}
-
-int crypto_kem_decaps(unsigned char *k,
-                      const unsigned char *ct,
-                      const unsigned char *sk)
-{
-  unsigned int i;
-  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_ENC_COIN_BYTES], m[CTRU_MSGBYTES];
-  unsigned char ct2[CTRU_PKE_CIPHERTEXTBYTES];
-  int16_t t;
-  int32_t fail;
-
-  crypto_pke_dec(m, ct, sk);
-
-  crypto_hash_sha_512(buf, m, CTRU_MSGBYTES);
-  crypto_stream(buf + CTRU_SHAREDKEYBYTES, CTRU_ENC_COIN_BYTES, nonce, buf + CTRU_SHAREDKEYBYTES);
-
-  crypto_pke_enc(ct2, sk + CTRU_PKE_SECRETKEYBYTES, m, buf + CTRU_SHAREDKEYBYTES);
-
-  t = 0;
-  for (i = 0; i < CTRU_PKE_CIPHERTEXTBYTES; ++i)
-    t |= ct[i] ^ ct2[i];
-
-  fail = (uint16_t)t;
-  fail = (-fail) >> 31;
-  for (i = 0; i < CTRU_SHAREDKEYBYTES; ++i)
-    k[i] = buf[i] & ~(-fail);
-
-  return fail;
-}
-
-#endif
-
-#elif (USING_NEV_FO == 1) 
-
-int crypto_kem_keygen(unsigned char *pk,
-                      unsigned char *sk)
-{
-  unsigned int i;
-  unsigned char coins[CTRU_KEYGEN_COIN_BYTES];
-
-  do
-  {
-    randombytes(coins, CTRU_SEEDBYTES);
-    crypto_hash_shake256(coins, CTRU_KEYGEN_COIN_BYTES, coins, CTRU_SEEDBYTES);
-
-  } while (crypto_pke_keygen(pk, sk, coins));
-
-  for (i = 0; i < CTRU_PKE_PUBLICKEYBYTES; ++i)
-    sk[i + CTRU_PKE_SECRETKEYBYTES] = pk[i];
-
-  crypto_hash_sha3_256(sk + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES, pk, CTRU_PKE_PUBLICKEYBYTES);
-
-  randombytes(sk + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES + CTRU_HASH_PUBLICKEYBYTES, CTRU_SEEDBYTES);
-
-  return 0;
-}
-
-int crypto_kem_encaps(unsigned char *ct,
-                      unsigned char *k,
-                      const unsigned char *pk)
-{
-  unsigned int i;
-  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_ENC_COIN_BYTES], m[CTRU_HASH_PUBLICKEYBYTES + CTRU_MSGBYTES];
-  unsigned char buf2[CTRU_SHAREDKEYBYTES + CTRU_PKE_CIPHERTEXTBYTES];
-
-  randombytes(buf, CTRU_SEEDBYTES);
-  crypto_hash_sha3_256(m, buf, CTRU_SEEDBYTES);
-  crypto_hash_sha3_256(m + CTRU_MSGBYTES, pk, CTRU_PKE_PUBLICKEYBYTES);
-
-  crypto_hash_sha3_512(buf, m, CTRU_HASH_PUBLICKEYBYTES + CTRU_MSGBYTES);
-  crypto_hash_shake256(buf + CTRU_SHAREDKEYBYTES, CTRU_ENC_COIN_BYTES, buf + CTRU_SHAREDKEYBYTES, CTRU_SEEDBYTES);
-
-  crypto_pke_enc(ct, pk, m, buf + CTRU_SHAREDKEYBYTES);
-
-  for (i = 0; i < CTRU_SHAREDKEYBYTES; ++i)
-    buf2[i] = buf[i];
-
-  for (i = 0; i < CTRU_PKE_CIPHERTEXTBYTES; ++i)
-    buf2[i + CTRU_SHAREDKEYBYTES] = ct[i];
-
-  crypto_hash_sha3_256(k, buf2, CTRU_SHAREDKEYBYTES + CTRU_PKE_CIPHERTEXTBYTES);
-
-  return 0;
-}
-
-int crypto_kem_decaps(unsigned char *k,
-                      const unsigned char *ct,
-                      const unsigned char *sk)
-{
-  unsigned int i;
-  unsigned char buf[CTRU_SHAREDKEYBYTES + CTRU_ENC_COIN_BYTES], m[CTRU_HASH_PUBLICKEYBYTES + CTRU_MSGBYTES];
-  unsigned char ct2[CTRU_PKE_CIPHERTEXTBYTES + CTRU_SHAREDKEYBYTES];
-  int16_t t;
-  int32_t fail;
-
-  crypto_pke_dec(m, ct, sk);
-
-  for (i = 0; i < CTRU_HASH_PUBLICKEYBYTES; ++i)
-    m[i + CTRU_MSGBYTES] = sk[i + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES];
-
-  crypto_hash_sha3_512(buf, m, CTRU_HASH_PUBLICKEYBYTES + CTRU_MSGBYTES);
-  crypto_hash_shake256(buf + CTRU_SHAREDKEYBYTES, CTRU_ENC_COIN_BYTES, buf + CTRU_SHAREDKEYBYTES, CTRU_SEEDBYTES);
-
-  crypto_pke_enc(ct2, sk + CTRU_PKE_SECRETKEYBYTES, m, buf + CTRU_SHAREDKEYBYTES);
-
-  t = 0;
-  for (i = 0; i < CTRU_PKE_CIPHERTEXTBYTES; ++i)
-    t |= ct[i] ^ ct2[i];
-
-  fail = (uint16_t)t;
-  fail = (-fail) >> 31;
-
-  for (i = 0; i < CTRU_SHAREDKEYBYTES; ++i)
-    ct2[i] = buf[i] ^ ((-fail) & (buf[i] ^ sk[i + CTRU_PKE_SECRETKEYBYTES + CTRU_PKE_PUBLICKEYBYTES + CTRU_HASH_PUBLICKEYBYTES]));
-
-  for (i = 0; i < CTRU_PKE_CIPHERTEXTBYTES; ++i)
-    ct2[i + CTRU_SHAREDKEYBYTES] = ct[i];
-
-  crypto_hash_sha3_256(k, ct2, CTRU_SHAREDKEYBYTES + CTRU_PKE_CIPHERTEXTBYTES);
-
-  return fail;
-}
-
-#endif

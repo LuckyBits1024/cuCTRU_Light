@@ -55,7 +55,6 @@ __device__ int16_t montgomery_reduce(int32_t a)
 {
   int32_t t;
   int16_t u;
-
   u = a * QINV;
   t = (int32_t)u * CTRU_Q;
   t = a - t;
@@ -66,7 +65,6 @@ __device__ int16_t montgomery_reduce(int32_t a)
 __device__ int16_t barrett_reduce(int16_t a)
 {
   int32_t t;
-
   t = BARRETT_V * (int32_t)a;
   t >>= 24;
   t *= CTRU_Q;

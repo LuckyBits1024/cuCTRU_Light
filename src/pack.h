@@ -11,6 +11,9 @@ void unpack_pk(poly *r, const unsigned char *a);
 void pack_sk(unsigned char *r, const poly *a);
 void unpack_sk(poly *r, const unsigned char *a);
 
+void pack_sk_f(unsigned char *r, const poly *a);
+void unpack_sk_f(poly *r, const unsigned char *a);
+
 void pack_ct(unsigned char *r, const poly *a);
 void unpack_ct(poly *r, const unsigned char *a);
 

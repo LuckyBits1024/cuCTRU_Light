@@ -87,31 +87,53 @@ int int16_negative_mask(int16_t x)
     u >>= 15;
     return -(int)u;
 }
-
-int rq_inverse(int16_t finv[ROOT_DIMENSION], const int16_t f[ROOT_DIMENSION], const int16_t zeta)
+int rq_inverse_opt(int16_t finv[ROOT_DIMENSION], const int16_t f[ROOT_DIMENSION], const int16_t zeta)
 {
-    int16_t Phi[ROOT_DIMENSION + 1], F[ROOT_DIMENSION + 1], V[ROOT_DIMENSION + 1], S[ROOT_DIMENSION + 1];
-    int i, loop, Delta, swap, t;
+    int16_t Phi[ROOT_DIMENSION + 1] = {1, 0, 0, 0, 0, 0, 0, 0, zeta};
+    int16_t V[ROOT_DIMENSION + 1] = {0};
+    int16_t S[ROOT_DIMENSION + 1] = {1, 0, 0, 0, 0, 0, 0, 0, 0};
+    int16_t F[ROOT_DIMENSION + 1] = {f[7], f[6], f[5], f[4], f[3], f[2], f[1], f[0], 0};
+    int i, loop, swap, t;
+    int Delta = 1;
     int32_t Phi0, F0;
     int16_t scale;
 
-    for (i = 0; i < ROOT_DIMENSION; ++i)
-        Phi[i] = 0;
-    Phi[0] = 1;
-    Phi[ROOT_DIMENSION] = fqmul(-zeta, 1);
+    // for (i = 0; i < ROOT_DIMENSION; ++i) {
+    //     Phi[i] = 0;
+    //     F[ROOT_DIMENSION - 1 - i] = f[i];
+    //     V[i] = 0;
+    //     S[i] = 0;
+    // }
+    // Phi[0] = 1;
+    // Phi[ROOT_DIMENSION] = zeta;
+    // F[ROOT_DIMENSION] = 0;
 
-    for (i = 0; i < ROOT_DIMENSION; ++i)
-        F[ROOT_DIMENSION - 1 - i] = f[i];
-    F[ROOT_DIMENSION] = 0;
+    // Delta = 1;
 
-    Delta = 1;
+    // V[ROOT_DIMENSION] = 0;
+    // S[ROOT_DIMENSION] = 0;
+    // S[0] = 1;
 
-    for (i = 0; i < ROOT_DIMENSION + 1; ++i)
-        V[i] = 0;
 
-    for (i = 0; i < ROOT_DIMENSION + 1; ++i)
-        S[i] = 0;
-    S[0] = 1;
+
+//    for (i = 0; i < ROOT_DIMENSION; ++i)
+//        Phi[i] = 0;
+//    Phi[0] = 1;
+//
+//    Phi[ROOT_DIMENSION] = zeta;
+//
+//    for (i = 0; i < ROOT_DIMENSION; ++i)
+//        F[ROOT_DIMENSION - 1 - i] = f[i];
+//    F[ROOT_DIMENSION] = 0;
+//
+//    Delta = 1;
+//
+//    for (i = 0; i < ROOT_DIMENSION + 1; ++i)
+//        V[i] = 0;
+//
+//    for (i = 0; i < ROOT_DIMENSION + 1; ++i)
+//        S[i] = 0;
+//    S[0] = 1;
 
     for (loop = 0; loop < 2 * ROOT_DIMENSION - 1; ++loop)
     {
@@ -150,7 +172,74 @@ int rq_inverse(int16_t finv[ROOT_DIMENSION], const int16_t f[ROOT_DIMENSION], co
     scale = Phi[0];
     scale += (scale >> 15) & CTRU_Q;
     scale = fq_inverse_table[scale];
-    // scale = fqinv(scale);
+    for (i = 0; i < ROOT_DIMENSION; ++i)
+        finv[i] = fq_freeze(scale * (int32_t)V[ROOT_DIMENSION - 1 - i]);
+
+    return int16_nonzero_mask(Delta);
+}
+int rq_inverse(int16_t finv[ROOT_DIMENSION], const int16_t f[ROOT_DIMENSION], const int16_t zeta)
+{
+    int16_t Phi[ROOT_DIMENSION + 1], F[ROOT_DIMENSION + 1], V[ROOT_DIMENSION + 1], S[ROOT_DIMENSION + 1];
+    int i, loop, Delta, swap, t;
+    int32_t Phi0, F0;
+    int16_t scale;
+
+    for (i = 0; i < ROOT_DIMENSION; ++i)
+        Phi[i] = 0;
+    Phi[0] = 1;
+    Phi[ROOT_DIMENSION] = fqmul(-zeta, 1);
+
+
+    for (i = 0; i < ROOT_DIMENSION; ++i)
+        F[ROOT_DIMENSION - 1 - i] = f[i];
+    F[ROOT_DIMENSION] = 0;
+
+    Delta = 1;
+
+    for (i = 0; i < ROOT_DIMENSION + 1; ++i)
+        V[i] = 0;
+
+    for (i = 0; i < ROOT_DIMENSION + 1; ++i)
+        S[i] = 0;
+    S[0] = 1;
+    
+    for (loop = 0; loop < 2 * ROOT_DIMENSION - 1; ++loop)
+    {
+        for (i = ROOT_DIMENSION; i > 0; --i)
+            V[i] = V[i - 1];
+        V[0] = 0;
+
+        swap = int16_negative_mask(-Delta) & int16_nonzero_mask(F[0]);
+
+        for (i = 0; i < ROOT_DIMENSION + 1; ++i)
+        {
+            t = swap & (Phi[i] ^ F[i]);
+            Phi[i] ^= t;
+            F[i] ^= t;
+            t = swap & (V[i] ^ S[i]);
+            V[i] ^= t;
+            S[i] ^= t;
+        }
+
+        Delta ^= swap & (Delta ^ -Delta);
+        Delta++;
+
+        Phi0 = Phi[0];
+        F0 = F[0];
+
+        for (i = 0; i < ROOT_DIMENSION + 1; ++i)
+            F[i] = fq_freeze(Phi0 * F[i] - F0 * Phi[i]);
+        for (i = 0; i < ROOT_DIMENSION; ++i)
+            F[i] = F[i + 1];
+        F[ROOT_DIMENSION] = 0;
+
+        for (i = 0; i < ROOT_DIMENSION + 1; ++i)
+            S[i] = fq_freeze(Phi0 * S[i] - F0 * V[i]);
+    }
+
+    scale = Phi[0];
+    scale += (scale >> 15) & CTRU_Q;
+    scale = fq_inverse_table[scale];
     for (i = 0; i < ROOT_DIMENSION; ++i)
         finv[i] = fq_freeze(scale * (int32_t)V[ROOT_DIMENSION - 1 - i]);
 

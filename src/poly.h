@@ -17,27 +17,26 @@ void poly_add(poly *c, const poly *a, const poly *b);
 void poly_double(poly *b, const poly *a);
 void poly_multi_p(poly *b, const poly *a);
 
-void poly_tomont(poly *a);
-void poly_frommont(poly *a);
-void poly_doublemont(poly *a);
 
-void poly_ntt_big(poly *b, const poly *a);
-void poly_ntt_small(poly *b, const poly *a);
-void poly_invntt(poly *b, const poly *a);
-void poly_invntt_without_mont(poly *b, const poly *a);
-void poly_basemul(poly *c, const poly *a, const poly *b);
+int poly_baseinv_opt(poly *b, const poly *a);
 int poly_baseinv(poly *b, const poly *a);
 
 void poly_sample_keygen(poly *a, const unsigned char *buf);
 void poly_sample_enc(poly *a, const unsigned char *buf);
 
-void poly_encode_compress(poly *c, const poly *sigma, const unsigned char *m);
-void poly_decode(unsigned char *m, const poly *c, const poly *fhat);
+void poly_naivemul_q2_opt(poly *c, const poly *a, const poly *b, const int Q);
 
-void poly_encode_e8(poly *mp, const unsigned char *msg);
-void poly_decode_e8(unsigned char *msg, const poly *mp);
-
-void poly_compress(poly *b, const poly *a);
-void poly_decompress(poly *b, const poly *a);
-
+void poly_naivemul_q(poly *c, const poly *a, const poly *b, int16_t q);
+void poly_encode_compress(poly *c,
+                          const poly *sigma,
+                          const unsigned char *msg);
+void poly_decode(unsigned char *msg,
+                 const poly *c,
+                 const poly *f);  
+void poly_ntt(poly *b);
+void poly_invntt(poly *b);    
+void poly_basemul(poly *c, const poly *a, const poly *b); 
+void poly_decode_opt(unsigned char *msg,
+                 const poly *c,
+                 const poly *f); 
 #endif

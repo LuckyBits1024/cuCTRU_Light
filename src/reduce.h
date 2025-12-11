@@ -7,13 +7,10 @@
 extern int16_t fq_inverse_table[CTRU_Q];
 
 
-#define MONT 171   // 2^16 mod 769   171的逆为9
+#define MONT 171   // 2^16 mod 769
 #define QINV 64769   // 769^(-1) mod 2^16
 
-// #define MONT 154    // 2^16 mod 641
-// #define QINV 15745    //641^(-1) mod 2^16
 
-// #define BARRETT_V 26174
 #define BARRETT_V 21817
 
 int16_t montgomery_reduce(int32_t a);

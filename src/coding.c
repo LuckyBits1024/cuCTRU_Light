@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include "params.h"
-#include "reduce.h"
 #include "coding.h"
 
 static int32_t sqr(int32_t x)
@@ -8,10 +7,10 @@ static int32_t sqr(int32_t x)
     return x * x;
 }
 
-static uint32_t abs_q(uint32_t x)
+static uint32_t abs_q2(uint32_t x)
 {
-    uint32_t mask = -((((CTRU_Q) - (x << 1)) >> 31) & 1);
-    return (mask & ((CTRU_Q)-x)) | ((~mask) & x);
+    uint32_t mask = -(((CTRU_Q2 - (x << 1)) >> 31) & 1);
+    return (mask & (CTRU_Q2 - x)) | ((~mask) & x);
 }
 
 static uint32_t const_abs(int32_t x)
@@ -94,8 +93,8 @@ uint8_t decode_e8(uint32_t vec[8])
 
     for (i = 0; i < 8; i++)
     {
-        tmp_cost[i][0] = sqr(abs_q(vec[i]));
-        tmp_cost[i][1] = sqr(const_abs(vec[i] - ((CTRU_Q) >> 1)));
+        tmp_cost[i][0] = sqr(abs_q2(vec[i]));
+        tmp_cost[i][1] = sqr(const_abs(vec[i] - (CTRU_Q2 >> 1)));
     }
 
     m[0] = decode_d8_00(cost + 0, tmp_cost);
