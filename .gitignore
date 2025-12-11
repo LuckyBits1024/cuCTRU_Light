@@ -5,3 +5,4 @@
 build/
 src/cmake-build-debug/
 cmake-build-debug/
+test/
