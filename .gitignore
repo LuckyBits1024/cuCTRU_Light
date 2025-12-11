@@ -1,0 +1,4 @@
+# 忽略IDE/编辑器相关文件夹
+.history/
+.idea/
+.vscode/
