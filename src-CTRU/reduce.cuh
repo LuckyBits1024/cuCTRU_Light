@@ -21,6 +21,6 @@ __device__ int16_t barrett_reduce(int16_t a);
 __device__ int16_t fqcsubq(int16_t a);
 __device__ int16_t fqmul(int16_t a, int16_t b);
 __device__ int16_t fqinv(int16_t a);
-__device__ int16_t fquniform();
+__host__ int16_t fquniform();
 
 #endif

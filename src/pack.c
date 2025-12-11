@@ -2,7 +2,7 @@
 #include "inverse.h"
 
 
-
+// 每组 4 个系数打包成 5 个字节的方案
 void pack_pk(unsigned char *r, const poly *a)
 {
     unsigned int i;

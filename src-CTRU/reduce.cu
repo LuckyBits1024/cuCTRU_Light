@@ -71,6 +71,7 @@ __device__ int16_t barrett_reduce(int16_t a)
   return a - t;
 }
 
+// 用来把系数规范到 [0, CTRU_Q)
 __device__ int16_t fqcsubq(int16_t a)
 {
   a += (a >> 15) & CTRU_Q;

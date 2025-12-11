@@ -6,3 +6,4 @@ build/
 src/cmake-build-debug/
 cmake-build-debug/
 test/
+GPU-1024/

@@ -108,7 +108,7 @@ __device__ void ntt(int16_t regs[8], int16_t *s_ntt){
 
 
 //invntt
-__device__ void invntt(int16_t regs[8], int16_t *s_ntt){
+__device__ void inv_ntt(int16_t regs[8], int16_t *s_ntt){
     // level 6
     inv_ntt_butt(regs[0], regs[1], zetas_inv[32 + (threadIdx.x / 8) * 4]);
     inv_ntt_butt(regs[2], regs[3], zetas_inv[33 + (threadIdx.x / 8) * 4]);
@@ -157,6 +157,17 @@ __device__ void invntt(int16_t regs[8], int16_t *s_ntt){
     inv_ntt_butt(regs[2], regs[6], zetas_inv[1]);
     inv_ntt_butt(regs[3], regs[7], zetas_inv[1]);
 
+    // 只是测试的时候用 把逆ntt的结果映射正常域
+    // #pragma unroll
+    // for (size_t i = 0; i < 8; i++)
+    //     regs[i] = fqmul(regs[i], 255);
+    // #pragma unroll
+    // for (size_t i = 0; i < 8; i++)
+    //     regs[i] = fqcsubq(regs[i]);
+
+}
+__device__ int16_t CALC_D(int16_t a[8], int16_t b[8], int16_t x, int16_t y, int16_t d[8]){
+    return fqmul((a[x] + a[y]), (b[x] + b[y])) - d[x] - d[y];
 }
 
 __device__ void basemul(int16_t a[8], int16_t b[8], int16_t c[8], int16_t zeta){
