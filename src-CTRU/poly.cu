@@ -1,3 +1,15 @@
+#include <cstddef>
+#include <cstdint>
+#include <stdint.h>
+#include <vector_types.h>
+#include "params.h"
+#include "reduce.cuh"
+#include "ntt.cuh"
+#include "poly.cuh"
+#include "coding.cuh"
+#include "cbd.cuh"
+#include "inv.cuh"
+
 __device__ void poly_reduce(poly &a){
     a.coeffs[8 * threadIdx.x] = barrett_reduce(a.coeffs[8 * threadIdx.x]);
     a.coeffs[8 * threadIdx.x + 1] = barrett_reduce(a.coeffs[8 * threadIdx.x + 1]);
@@ -74,16 +86,19 @@ __device__ void poly_invntt(int16_t regs[8], int16_t *s_ntt){
     inv_ntt(regs, s_ntt);
 }
 
-__device__ void poly_sample_keygen(poly &a, const unsigned char buf[CTRU_N / 2]){
-    cbd2(a, buf);
+__device__ void poly_sample_keygen(poly *a, const unsigned char *buf)
+{
+  cbd1(a, buf);
 }
-__device__ void poly_sample_enc(poly &a, const unsigned char buf[CTRU_N / 2]){
-    cbd2(a, buf);
+
+__device__ void poly_sample_enc(poly *a, const unsigned char *buf)
+{
+  cbd1(a, buf);
 }
 
 __device__ void poly_basemul(poly *c, const poly *a, const poly *b){
     if (threadIdx.x < CTRU_N / 16) {
-        int16_t z = zetas[32 + threadIdx.x];
+        int16_t z = zetas_base[32 + threadIdx.x];
         int16_t regsA[8], regsB[8], regsC[8];
         for (int k = 0; k < 8; ++k) {
             regsA[k] = a->coeffs[threadIdx.x * 16 + k];
@@ -94,7 +109,7 @@ __device__ void poly_basemul(poly *c, const poly *a, const poly *b){
             c->coeffs[threadIdx.x * 16 + k] = regsC[k];
         }
     } else if (threadIdx.x < 2 * (CTRU_N / 16)) {
-        int16_t z = -zetas[32 + (threadIdx.x - (CTRU_N / 16))];
+        int16_t z = -zetas_base[32 + (threadIdx.x - (CTRU_N / 16))];
         int16_t regsA[8], regsB[8], regsC[8];
         for (int k = 0; k < 8; ++k) {
             regsA[k] = a->coeffs[(threadIdx.x - (CTRU_N / 16)) * 16 + 8 + k];

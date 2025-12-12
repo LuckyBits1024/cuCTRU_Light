@@ -1,5 +1,14 @@
+#include <cstddef>
+#include <cstdint>
 #include <stdint.h>
-#include "pack.cuh"
+#include <vector_types.h>
+#include "params.h"
+#include "reduce.cuh"
+#include "ntt.cuh"
+#include "poly.cuh"
+#include "coding.cuh"
+#include "cbd.cuh"
+#include "inv.cuh"
 
 __device__ void pack_pk(unsigned char *r, const poly &a){
     r[10 * threadIdx.x + 0] = (a.coeffs[8 * threadIdx.x] >> 0);
@@ -16,19 +25,18 @@ __device__ void pack_pk(unsigned char *r, const poly &a){
 }
 
 __device__ void unpack_pk(int16_t regs[8], const unsigned char *a){
-    regs[0] = ((a[10 * threadIdx.x + 0] >> 0) | ((uint16_t)a[10 * threadIdx.x + 1] << 8)) & 0xFFF;
-    regs[1] = ((a[10 * threadIdx.x + 1] >> 2) | ((uint16_t)a[10 * threadIdx.x + 2] << 6)) & 0xFFF;
-    regs[2] = ((a[10 * threadIdx.x + 2] >> 4) | ((uint16_t)a[10 * threadIdx.x + 3] << 4)) & 0xFFF;
-    regs[3] = ((a[10 * threadIdx.x + 3] >> 6) | ((uint16_t)a[10 * threadIdx.x + 4] << 2)) & 0xFFF;
+    regs[0] = ((a[10 * threadIdx.x + 0] >> 0) | ((uint16_t)a[10 * threadIdx.x + 1] << 8)) & 0x3FF;
+    regs[1] = ((a[10 * threadIdx.x + 1] >> 2) | ((uint16_t)a[10 * threadIdx.x + 2] << 6)) & 0x3FF;
+    regs[2] = ((a[10 * threadIdx.x + 2] >> 4) | ((uint16_t)a[10 * threadIdx.x + 3] << 4)) & 0x3FF;
+    regs[3] = ((a[10 * threadIdx.x + 3] >> 6) | ((uint16_t)a[10 * threadIdx.x + 4] << 2)) & 0x3FF;
 
-    regs[4] = ((a[10 * threadIdx.x + 4] >> 0) | ((uint16_t)a[10 * threadIdx.x + 5] << 8)) & 0xFFF;
-    regs[5] = ((a[10 * threadIdx.x + 5] >> 2) | ((uint16_t)a[10 * threadIdx.x + 6] << 6)) & 0xFFF;
-    regs[6] = ((a[10 * threadIdx.x + 6] >> 4) | ((uint16_t)a[10 * threadIdx.x + 7] << 4)) & 0xFFF;
-    regs[7] = ((a[10 * threadIdx.x + 7] >> 6) | ((uint16_t)a[10 * threadIdx.x + 8] << 2)) & 0xFFF;
+    regs[4] = ((a[10 * threadIdx.x + 4] >> 0) | ((uint16_t)a[10 * threadIdx.x + 5] << 8)) & 0x3FF;
+    regs[5] = ((a[10 * threadIdx.x + 5] >> 2) | ((uint16_t)a[10 * threadIdx.x + 6] << 6)) & 0x3FF;
+    regs[6] = ((a[10 * threadIdx.x + 6] >> 4) | ((uint16_t)a[10 * threadIdx.x + 7] << 4)) & 0x3FF;
+    regs[7] = ((a[10 * threadIdx.x + 7] >> 6) | ((uint16_t)a[10 * threadIdx.x + 8] << 2)) & 0x3FF;
 }
 __device__ void pack_sk(unsigned char *r, const poly &a){
     uint8_t t[8];
-    int i = threadIdx.x;
     t[0] = CTRU_BOUND - a.coeffs[8 * threadIdx.x + 0];
     t[1] = CTRU_BOUND - a.coeffs[8 * threadIdx.x + 1];
     t[2] = CTRU_BOUND - a.coeffs[8 * threadIdx.x + 2];
@@ -44,26 +52,26 @@ __device__ void pack_sk(unsigned char *r, const poly &a){
 }
 
 __device__ void unpack_sk(poly &r, const unsigned char *a){
-    r.coeffs[8 * threadIdx.x + 0] = CTRU_BOUND - (a[3 * threadIdx.x + 0] >> 0) & 0x7;
-    r.coeffs[8 * threadIdx.x + 1] = CTRU_BOUND - (a[3 * threadIdx.x + 0] >> 3) & 0x7;
-    r.coeffs[8 * threadIdx.x + 2] = CTRU_BOUND - ((a[3 * threadIdx.x + 0] >> 6) | (a[3 * threadIdx.x + 1] << 2)) & 0x7;
-    r.coeffs[8 * threadIdx.x + 3] = CTRU_BOUND - (a[3 * threadIdx.x + 1] >> 1) & 0x7;
-    r.coeffs[8 * threadIdx.x + 4] = CTRU_BOUND - (a[3 * threadIdx.x + 1] >> 4) & 0x7;
-    r.coeffs[8 * threadIdx.x + 5] = CTRU_BOUND - ((a[3 * threadIdx.x + 1] >> 7) | (a[3 * threadIdx.x + 2] << 1)) & 0x7;
-    r.coeffs[8 * threadIdx.x + 6] = CTRU_BOUND - (a[3 * threadIdx.x + 2] >> 2) & 0x7;
-    r.coeffs[8 * threadIdx.x + 7] = CTRU_BOUND - (a[3 * threadIdx.x + 2] >> 5) & 0x7;
+    r.coeffs[8 * threadIdx.x + 0] = CTRU_BOUND - ((a[3 * threadIdx.x + 0] >> 0) & 0x7);
+    r.coeffs[8 * threadIdx.x + 1] = CTRU_BOUND - ((a[3 * threadIdx.x + 0] >> 3) & 0x7);
+    r.coeffs[8 * threadIdx.x + 2] = CTRU_BOUND - (((a[3 * threadIdx.x + 0] >> 6) | (a[3 * threadIdx.x + 1] << 2)) & 0x7);
+    r.coeffs[8 * threadIdx.x + 3] = CTRU_BOUND - ((a[3 * threadIdx.x + 1] >> 1) & 0x7);
+    r.coeffs[8 * threadIdx.x + 4] = CTRU_BOUND - ((a[3 * threadIdx.x + 1] >> 4) & 0x7);
+    r.coeffs[8 * threadIdx.x + 5] = CTRU_BOUND - (((a[3 * threadIdx.x + 1] >> 7) | (a[3 * threadIdx.x + 2] << 1)) & 0x7);
+    r.coeffs[8 * threadIdx.x + 6] = CTRU_BOUND - ((a[3 * threadIdx.x + 2] >> 2) & 0x7);
+    r.coeffs[8 * threadIdx.x + 7] = CTRU_BOUND - ((a[3 * threadIdx.x + 2] >> 5) & 0x7);
 }
 
 __device__ void pack_ct(unsigned char *r, const int16_t regs[8]){
 
-    r[8 * threadIdx.x + 0] = (uint8_t)regs[8 * threadIdx.x + 0];
-    r[8 * threadIdx.x + 1] = (uint8_t)regs[8 * threadIdx.x + 1];
-    r[8 * threadIdx.x + 2] = (uint8_t)regs[8 * threadIdx.x + 2];
-    r[8 * threadIdx.x + 3] = (uint8_t)regs[8 * threadIdx.x + 3];
-    r[8 * threadIdx.x + 4] = (uint8_t)regs[8 * threadIdx.x + 4];
-    r[8 * threadIdx.x + 5] = (uint8_t)regs[8 * threadIdx.x + 5];
-    r[8 * threadIdx.x + 6] = (uint8_t)regs[8 * threadIdx.x + 6];
-    r[8 * threadIdx.x + 7] = (uint8_t)regs[8 * threadIdx.x + 7];
+    r[8 * threadIdx.x + 0] = (uint8_t)regs[0];
+    r[8 * threadIdx.x + 1] = (uint8_t)regs[1];
+    r[8 * threadIdx.x + 2] = (uint8_t)regs[2];
+    r[8 * threadIdx.x + 3] = (uint8_t)regs[3];
+    r[8 * threadIdx.x + 4] = (uint8_t)regs[4];
+    r[8 * threadIdx.x + 5] = (uint8_t)regs[5];
+    r[8 * threadIdx.x + 6] = (uint8_t)regs[6];
+    r[8 * threadIdx.x + 7] = (uint8_t)regs[7];
 }
 
 __device__ void unpack_ct(int16_t r[CTRU_N], const unsigned char *a){

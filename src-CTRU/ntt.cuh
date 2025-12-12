@@ -14,6 +14,8 @@
 
 extern __device__ int16_t zetas[64];
 extern __device__ int16_t zetas_inv[64];
+extern __device__ int16_t zetas_base[64];
+extern __device__ int16_t zetas_inv_base[64];
 
 __device__ void ntt_big(int16_t *a, const int16_t *in);
 __device__ void ntt_small(int16_t *a, const int16_t *in);

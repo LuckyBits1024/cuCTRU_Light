@@ -1,0 +1,10 @@
+#ifndef CBD_H
+#define CBD_H
+
+#include <stdint.h>
+#include "params.h"
+#include "poly.cuh"
+
+__device__ void cbd1(poly *r, const uint8_t buf[CTRU_CBD1_BYTES]);
+
+#endif
