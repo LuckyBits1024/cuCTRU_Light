@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "params.h"
-#include "inverse.cuh"
+#include "inv.cuh"
 #include "reduce.cuh"
 #include "poly.cuh"
 #include "ntt.cuh"

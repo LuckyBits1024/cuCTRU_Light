@@ -2,6 +2,31 @@
 #include "poly.h"
 #include "pack.h"
 #include <stdio.h>
+// int pke_keygen(unsigned char pk[CTRU_PKE_PUBLICKEYBYTES],
+//                       unsigned char sk[CTRU_PKE_SECRETKEYBYTES],
+//                       const unsigned char coins[CTRU_COINBYTES_KEYGEN])
+// {
+//   int r;
+//   poly f, g, hhat, finv;
+
+//   poly_sample_keygen(&f, coins);
+//   poly_sample_keygen(&g, coins + CTRU_COINBYTES_KEYGEN / 2);
+
+//   poly_double(&f, &f);
+//   f.coeffs[0] += 1;
+//   //先pack，因为后面值会变
+//   pack_sk(sk, &f);
+//   poly_ntt(&f);
+//   poly_ntt(&g);
+
+//   r = poly_baseinv(&finv, &f);
+//   poly_basemul(&hhat, &g, &finv);
+//   poly_invntt(&hhat);
+//   poly_freeze(&hhat);
+//   pack_pk(pk, &hhat);
+
+//   return r;
+// }
 
 int pke_keygen(unsigned char pk[CTRU_PKE_PUBLICKEYBYTES],
                       unsigned char sk[CTRU_PKE_SECRETKEYBYTES],
@@ -13,11 +38,10 @@ int pke_keygen(unsigned char pk[CTRU_PKE_PUBLICKEYBYTES],
   poly_sample_keygen(&f, coins);
   poly_sample_keygen(&g, coins + CTRU_COINBYTES_KEYGEN / 2);
 
-  pack_sk_f(sk, &f);
-
   poly_double(&f, &f);
   f.coeffs[0] += 1;
-
+  //先pack，因为后面值会变
+  pack_sk(sk, &f);
   poly_ntt(&f);
   poly_ntt(&g);
 
@@ -55,7 +79,7 @@ void pke_dec(unsigned char m[CTRU_MSGBYTES],
   poly c, fhat;
 
   unpack_ct(&c, ct);
-  unpack_sk_f(&fhat, sk);
+  unpack_sk(&fhat, sk);
   
-  poly_decode_opt(m, &c, &fhat);
+  poly_decode(m, &c, &fhat);
 }

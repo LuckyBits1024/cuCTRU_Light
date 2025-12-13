@@ -17,4 +17,9 @@ int kem_dec(
 unsigned char * sk, unsigned long long sk_byts,
 unsigned char * ct, unsigned long long ct_byts,
 unsigned char * ss, unsigned long long * ss_byts);
+int kem_keygen_opt(unsigned char * pk, unsigned long long * pk_byts, unsigned char * sk, unsigned long long * sk_byts);
+int kem_dec_opt(
+unsigned char * sk, unsigned long long sk_byts,
+unsigned char * ct, unsigned long long ct_byts,
+unsigned char * ss, unsigned long long * ss_byts);
 #endif

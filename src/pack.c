@@ -3,6 +3,7 @@
 
 
 // 每组 4 个系数打包成 5 个字节的方案
+
 void pack_pk(unsigned char *r, const poly *a)
 {
     unsigned int i;
@@ -98,55 +99,4 @@ void unpack_ct(poly *r, const unsigned char *a)
         r->coeffs[i] = (int16_t)a[i];
     }
 
-}
-
-
-void pack_sk_f(unsigned char *r, const poly *a)
-{
-  int i;
-  unsigned char c;
-
-  for(i=0; i<CTRU_N/5; i++)
-  {
-    c =       (a->coeffs[5*i+4] + CTRU_ETA) & 255;
-    c = (3*c + a->coeffs[5*i+3] + CTRU_ETA) & 255;
-    c = (3*c + a->coeffs[5*i+2] + CTRU_ETA) & 255;
-    c = (3*c + a->coeffs[5*i+1] + CTRU_ETA) & 255;
-    c = (3*c + a->coeffs[5*i+0] + CTRU_ETA) & 255;
-    r[i] = c;
-  }
-#if CTRU_N > (CTRU_N / 5) * 5  
-  int j;
-  i = CTRU_N / 5;
-  c = 0;
-  for(j = CTRU_N - (5*i) - 1; j>=0; j--)
-    c = (3*c + a->coeffs[5*i+j] + CTRU_ETA) & 255;
-  r[i] = c;
-#endif
-}
-
-void unpack_sk_f(poly *r, const unsigned char *a)
-{
-  int i;
-  unsigned char c;
-
-  for(i=0; i<CTRU_N/5; i++)
-  {
-    c = a[i];
-    r->coeffs[5*i+0] = (c%3 - CTRU_ETA) << 1; c/=3; 
-    r->coeffs[5*i+1] = (c%3 - CTRU_ETA) << 1; c/=3;  
-    r->coeffs[5*i+2] = (c%3 - CTRU_ETA) << 1; c/=3; 
-    r->coeffs[5*i+3] = (c%3 - CTRU_ETA) << 1; c/=3;  
-    r->coeffs[5*i+4] = (c%3 - CTRU_ETA) << 1;  
-  }
-#if CTRU_N > (CTRU_N / 5) * 5  // if 5 does not divide NTRU_N-1
-  i = CTRU_N/5;
-  int j;
-  c = a[i];
-  for(j=0; (5*i+j)<CTRU_N; j++)
-  {
-    r->coeffs[5*i+j] =(c%3 - CTRU_ETA) << 1; c /= 3;
-  }
-#endif
-  r->coeffs[0] += 1; 
 }

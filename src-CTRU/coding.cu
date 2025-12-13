@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include "params.h"
-#include "coding.h"
+#include "coding.cuh"
 
 __device__ static int32_t sqr(int32_t x)
 {

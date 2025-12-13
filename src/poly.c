@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include "cpucycles.h"
 #include "params.h"
 #include "reduce.h"
 #include "poly.h"
@@ -128,10 +127,6 @@ int poly_baseinv_opt(poly *b, const poly *a)
 }
 
 
-
-
-
-
 void poly_encode_compress(poly *c,
                           const poly *sigma,
                           const unsigned char *msg)
@@ -163,32 +158,32 @@ void poly_encode_compress(poly *c,
   }
 }
 
-void poly_decode(unsigned char *msg,
-                 const poly *c,
-                 const poly *f)
-{
-  unsigned int i, j;
-  poly mp;
-  uint32_t tmp_mp[8];
+// void poly_decode(unsigned char *msg,
+//                  const poly *c,
+//                  const poly *f)
+// {
+//   unsigned int i, j;
+//   poly mp;
+//   uint32_t tmp_mp[8];
 
-  poly_naivemul_q2(&mp, c, f, CTRU_Q2);
+//   poly_naivemul_q2(&mp, c, f, CTRU_Q2);
   
 
-  for (i = 0; i < CTRU_MSGBYTES; i++)
-  {
-    msg[i] = 0;
-  }
+//   for (i = 0; i < CTRU_MSGBYTES; i++)
+//   {
+//     msg[i] = 0;
+//   }
 
-  for (i = 0; i < CTRU_N / 8; i++)
-  {
-    for (j = 0; j < 8; j++)
-    {
-      tmp_mp[j] = (uint32_t)mp.coeffs[8 * i + j];
-    }
-    msg[i >> 1] |= decode_e8(tmp_mp) << ((i & 1) << 2);
-  }
-}
-void poly_decode_opt(unsigned char *msg,
+//   for (i = 0; i < CTRU_N / 8; i++)
+//   {
+//     for (j = 0; j < 8; j++)
+//     {
+//       tmp_mp[j] = (uint32_t)mp.coeffs[8 * i + j];
+//     }
+//     msg[i >> 1] |= decode_e8(tmp_mp) << ((i & 1) << 2);
+//   }
+// }
+void poly_decode(unsigned char *msg,
                  const poly *c,
                  const poly *f)
 {
@@ -237,5 +232,3 @@ void poly_basemul(poly *c, const poly *a, const poly *b)
             -zetas[32 + i]);
   }
 }
-
-
